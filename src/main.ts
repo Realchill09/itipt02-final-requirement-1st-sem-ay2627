@@ -1,3 +1,4 @@
+
 import { bootstrapApplication } from '@angular/platform-browser';
 import {
   RouteReuseStrategy,
@@ -6,6 +7,8 @@ import {
   withPreloading,
   PreloadAllModules,
 } from '@angular/router';
+
+import { provideHttpClient } from '@angular/common/http';
 import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular';
 
 import { AppComponent } from './app/app.component';
@@ -15,6 +18,11 @@ bootstrapApplication(AppComponent, {
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     provideIonicAngular(),
-    provideRouter(routes, withPreloading(PreloadAllModules), withComponentInputBinding()),
+    provideHttpClient(),
+    provideRouter(
+      routes,
+      withPreloading(PreloadAllModules),
+      withComponentInputBinding()
+    ),
   ],
-});
+}).catch((error) => console.error(error));
