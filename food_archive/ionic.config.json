@@ -1,0 +1,7 @@
+{
+  "name": "food_archive",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
