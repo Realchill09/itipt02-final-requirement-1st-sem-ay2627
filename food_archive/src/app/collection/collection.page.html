@@ -1,0 +1,83 @@
+<ion-header>
+  <ion-toolbar color="light">
+    <ion-menu-button slot="start" menu="navigation-menu" aria-label="Open menu"></ion-menu-button>
+    <ion-title>My Collections</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="collections-container">
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Create a collection</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-item>
+          <ion-input
+            label="Collection name"
+            labelPlacement="stacked"
+            placeholder="For example, Weeknight meals"
+            [(ngModel)]="newCollectionName">
+          </ion-input>
+        </ion-item>
+        <ion-button expand="block" (click)="createCollection()" [disabled]="!newCollectionName.trim()">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Create Collection
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+
+    @for (collection of collections; track collection.id) {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>{{ collection.name }}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item>
+            <ion-select
+              label="Choose a recipe"
+              labelPlacement="stacked"
+              [(ngModel)]="selectedRecipeIds[collection.id]">
+              @for (recipe of recipes(); track recipe.id) {
+                <ion-select-option
+                  [value]="recipe.id"
+                  [disabled]="hasRecipe(collection, recipe.id)">
+                  {{ recipe.name }}
+                </ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-button
+            expand="block"
+            fill="outline"
+            (click)="addRecipe(collection)"
+            [disabled]="!selectedRecipeIds[collection.id]">
+            Add Recipe
+          </ion-button>
+
+          @for (recipe of collection.recipes; track recipe.id) {
+            <ion-item>
+              <ion-label>{{ recipe.name }}</ion-label>
+              <ion-button
+                slot="end"
+                fill="clear"
+                color="danger"
+                (click)="removeRecipe(collection, recipe.id)"
+                [attr.aria-label]="'Remove ' + recipe.name">
+                <ion-icon name="trash-outline"></ion-icon>
+              </ion-button>
+            </ion-item>
+          } @empty {
+            <p class="empty-collection">No recipes in this collection yet.</p>
+          }
+
+          <ion-button fill="clear" color="danger" (click)="deleteCollection(collection)">
+            Delete Collection
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+    } @empty {
+      <p class="empty-collection">Create a collection to organize your recipes.</p>
+    }
+  </main>
+</ion-content>
