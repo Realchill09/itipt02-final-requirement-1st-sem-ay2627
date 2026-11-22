@@ -1,0 +1,30 @@
+# Python environments and generated files
+.venv/
+venv/
+env/
+backend/Lib/
+backend/Scripts/
+backend/Include/
+backend/pyvenv.cfg
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node, Angular, and Capacitor output
+node_modules/
+food_archive/.angular/
+food_archive/dist/
+food_archive/www/
+
+# Local configuration and runtime uploads
+.env
+.env.*
+!.env.example
+backend/uploads/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
