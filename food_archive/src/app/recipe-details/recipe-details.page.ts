@@ -247,14 +247,12 @@ export class RecipeDetailsPage implements OnInit {
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this comment?')) {
-      return;
-    }
-
     this.commentService.deleteComment(comment.id, recipe.id).subscribe({
       next: (response) => {
         if (!response.success) {
           void this.showToast(response.message || 'Unable to delete comment.');
+        } else {
+          void this.showToast('Comment deleted.', 'success');
         }
       },
       error: (error) => {
@@ -279,12 +277,12 @@ export class RecipeDetailsPage implements OnInit {
     this.router.navigate(['/home']);
   }
 
-  private async showToast(message: string): Promise<void> {
+  private async showToast(message: string, color: 'danger' | 'success' = 'danger'): Promise<void> {
     const toast = await this.toastController.create({
       message,
       duration: 3000,
       position: 'top',
-      color: 'danger',
+      color,
     });
     await toast.present();
   }

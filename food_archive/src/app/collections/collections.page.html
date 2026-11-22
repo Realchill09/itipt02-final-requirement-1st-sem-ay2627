@@ -17,17 +17,21 @@
             label="Collection name"
             labelPlacement="stacked"
             placeholder="For example, Weeknight meals"
-            [(ngModel)]="newCollectionName">
+            [ngModel]="newCollectionName()"
+            (ngModelChange)="newCollectionName.set($event)">
           </ion-input>
         </ion-item>
-        <ion-button expand="block" (click)="createCollection()" [disabled]="!newCollectionName.trim()">
+        <ion-button
+          expand="block"
+          (click)="createCollection()"
+          [disabled]="!newCollectionName().trim() || creatingCollection()">
           <ion-icon name="add-outline" slot="start"></ion-icon>
           Create Collection
         </ion-button>
       </ion-card-content>
     </ion-card>
 
-    @for (collection of collections; track collection.id) {
+    @for (collection of collections(); track collection.id) {
       <ion-card>
         <ion-card-header>
           <ion-card-title>{{ collection.name }}</ion-card-title>
@@ -37,7 +41,8 @@
             <ion-select
               label="Choose a recipe"
               labelPlacement="stacked"
-              [(ngModel)]="selectedRecipeIds[collection.id]">
+              [ngModel]="selectedRecipeIds()[collection.id]"
+              (ngModelChange)="setSelectedRecipe(collection.id, $event)">
               @for (recipe of recipes(); track recipe.id) {
                 <ion-select-option
                   [value]="recipe.id"
@@ -51,7 +56,7 @@
             expand="block"
             fill="outline"
             (click)="addRecipe(collection)"
-            [disabled]="!selectedRecipeIds[collection.id]">
+            [disabled]="!selectedRecipeIds()[collection.id]">
             Add Recipe
           </ion-button>
 
@@ -71,7 +76,11 @@
             <p class="empty-collection">No recipes in this collection yet.</p>
           }
 
-          <ion-button fill="clear" color="danger" (click)="deleteCollection(collection)">
+          <ion-button
+            fill="clear"
+            color="danger"
+            (click)="deleteCollection(collection)"
+            [disabled]="collection.id < 0 || deletingCollectionIds().has(collection.id)">
             Delete Collection
           </ion-button>
         </ion-card-content>

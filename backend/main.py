@@ -1,7 +1,7 @@
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Callable, Generator, cast
 
 import mysql.connector
 from dotenv import dotenv_values
@@ -9,12 +9,16 @@ from fastapi import Depends, FastAPI, File, HTTPException, Path as ApiPath, Quer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from mysql.connector import MySQLConnection
 from mysql.connector.errors import Error as MySQLError
 from pydantic import BaseModel, Field
 
+# mysql-connector-python exposes inconsistent connection overloads to Pylance.
+# Any keeps the connector boundary typed without misrepresenting its return union.
+DBConnection = Any
+
+
 # Load optional backend settings from the .env file beside this module.
-SETTINGS = dotenv_values(Path(__file__).with_name(".env"))
+SETTINGS: dict[str, str | None] = dotenv_values(Path(__file__).with_name(".env"))
 
 
 def setting(name: str, default: str) -> str:
@@ -30,11 +34,14 @@ SESSION_COOKIE_SECURE = setting("SESSION_COOKIE_SECURE", "false").lower() == "tr
 UPLOAD_DIRECTORY = Path(__file__).resolve().parent / "uploads"
 UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
-ALLOWED_IMAGES = {
+ALLOWED_IMAGES: dict[str, tuple[str, Callable[[bytes], bool]]] = {
     ".jpg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
     ".jpeg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
     ".png": ("image/png", lambda data: data.startswith(b"\x89PNG\r\n\x1a\n")),
-    ".webp": ("image/webp", lambda data: data[:4] == b"RIFF" and data[8:12] == b"WEBP"),
+    ".webp": (
+        "image/webp",
+        lambda data: len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP",
+    ),
 }
 
 app = FastAPI()
@@ -42,7 +49,13 @@ app = FastAPI()
 # Allow cross-origin requests and serve uploaded images from the uploads directory.
 app.add_middleware (
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://127.0.0.1:4200",
+        "http://localhost:4200",
+        "http://127.0.0.1:8100",
+        "http://localhost:8100",
+        "capacitor://localhost",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -136,10 +149,10 @@ class ImageUploadResponse(BaseModel):
     url: str
 
 
-def get_db() -> Generator[MySQLConnection, None, None]:
+def get_db() -> Generator[Any, None, None]:
     # Open a database connection and expose connection failures as service errors.
     try:
-        db = mysql.connector.connect(
+        db: Any = mysql.connector.connect(
             host=setting("DB_HOST", "127.0.0.1"),
             port=int(setting("DB_PORT", "3306")),
             user=setting("DB_USER", "root"),
@@ -172,7 +185,7 @@ def is_admin(user: dict[str, Any]) -> bool:
 
 def get_current_user(
     request: Request,
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Require the session cookie before looking up the user's active session.
     session_id = request.cookies.get("foodarchive_session")
@@ -191,7 +204,7 @@ def get_current_user(
             """,
             (session_id,),
         )
-        user = cursor.fetchone()
+        user = cast(dict[str, Any] | None, cursor.fetchone())
 
     # Reject missing or expired sessions and normalize the returned role.
     if not user:
@@ -214,13 +227,17 @@ def decode_array(value: Any) -> list[str]:
         return []
     # Convert already-decoded list elements to strings for a consistent response.
     if isinstance(value, list):
-        return [str(item) for item in value]
+        items = cast(list[Any], value)
+        return [str(item) for item in items]
     # Fall back to non-empty lines when the stored value is not valid JSON.
     try:
-        value = json.loads(value)
+        decoded: Any = json.loads(value)
     except (TypeError, json.JSONDecodeError):
         return [line for line in str(value).splitlines() if line]
-    return [str(item) for item in value] if isinstance(value, list) else []
+    if isinstance(decoded, list):
+        items = cast(list[Any], decoded)
+        return [str(item) for item in items]
+    return []
 
 
 def format_recipe(row: dict[str, Any]) -> dict[str, Any]:
@@ -239,7 +256,7 @@ def require_collection_owner(cursor: Any, collection_id: int, user_id: int) -> N
         raise HTTPException(status_code=404, detail="Collection not found.")
 
 
-def rating_summary(db: MySQLConnection, recipe_id: int, user_id: int) -> dict[str, Any]:
+def rating_summary(db: DBConnection, recipe_id: int, user_id: int) -> dict[str, Any]:
     # Calculate the average and count, along with this user's own rating.
     with db.cursor(dictionary=True) as cursor:
         cursor.execute(
@@ -252,7 +269,7 @@ def rating_summary(db: MySQLConnection, recipe_id: int, user_id: int) -> dict[st
             """,
             (user_id, recipe_id),
         )
-        result = cursor.fetchone()
+        result = cast(dict[str, Any], cursor.fetchone())
     return {
         "average_rating": float(result["average_rating"]),
         "rating_count": result["rating_count"],
@@ -261,7 +278,7 @@ def rating_summary(db: MySQLConnection, recipe_id: int, user_id: int) -> dict[st
 
 
 @app.get("/api/health")
-def health(db: MySQLConnection = Depends(get_db)) -> dict[str, str]:
+def health(db: DBConnection = Depends(get_db)) -> dict[str, str]:
     # Confirm that the API can execute a simple database query.
     with db.cursor() as cursor:
         cursor.execute("SELECT 1")
@@ -270,7 +287,7 @@ def health(db: MySQLConnection = Depends(get_db)) -> dict[str, str]:
 
 
 @app.post("/api/auth/register")
-def register(request: RegisterRequest, db: MySQLConnection = Depends(get_db)) -> dict[str, Any]:
+def register(request: RegisterRequest, db: DBConnection = Depends(get_db)) -> dict[str, Any]:
     # Prevent duplicate usernames or emails before inserting a new account.
     with db.cursor(dictionary=True) as cursor:
         cursor.execute(
@@ -289,7 +306,7 @@ def register(request: RegisterRequest, db: MySQLConnection = Depends(get_db)) ->
 
 
 @app.post("/api/auth/login")
-def login(request: LoginRequest, response: Response, db: MySQLConnection = Depends(get_db)) -> dict[str, Any]:
+def login(request: LoginRequest, response: Response, db: DBConnection = Depends(get_db)) -> dict[str, Any]:
     # Find the account and reject invalid credentials before creating a session.
     with db.cursor(dictionary=True) as cursor:
         cursor.execute(
@@ -299,19 +316,20 @@ def login(request: LoginRequest, response: Response, db: MySQLConnection = Depen
             """,
             (request.email,),
         )
-        user = cursor.fetchone()
+        user = cast(dict[str, Any] | None, cursor.fetchone())
 
     # Do not create a session unless both the account and password match.
     if not user or request.password != user["stored_password"]:
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
     # Remove expired sessions and store a new session with a fixed expiration.
-    public_user = {
+    public_user: dict[str, Any] = {}
+    public_user.update({
         "id": user["id"],
         "username": user["username"],
         "email": user["email"],
         "role": "admin" if is_admin(user) else "user",
-    }
+    })
     session_id = uuid.uuid4().hex
     with db.cursor() as cursor:
         cursor.execute("DELETE FROM user_sessions WHERE expires_at <= UTC_TIMESTAMP()")
@@ -332,12 +350,13 @@ def login(request: LoginRequest, response: Response, db: MySQLConnection = Depen
         httponly=True,
         secure=SESSION_COOKIE_SECURE,
         samesite="lax",
+        path="/",
     )
     return {"success": True, "message": "Login successful.", "user": public_user}
 
 
 @app.post("/api/auth/logout")
-def logout(request: Request, response: Response, db: MySQLConnection = Depends(get_db)) -> dict[str, Any]:
+def logout(request: Request, response: Response, db: DBConnection = Depends(get_db)) -> dict[str, Any]:
     # Delete the server-side session when a cookie is present, then clear it.
     session_id = request.cookies.get("foodarchive_session")
     # A missing cookie needs no database deletion.
@@ -350,6 +369,7 @@ def logout(request: Request, response: Response, db: MySQLConnection = Depends(g
         httponly=True,
         secure=SESSION_COOKIE_SECURE,
         samesite="lax",
+        path="/",
     )
     return {"success": True, "message": "Logged out."}
 
@@ -364,7 +384,7 @@ def current_user(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, 
 def update_profile(
     request: ProfileRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Check for username or email conflicts before saving the profile changes.
     with db.cursor(dictionary=True) as cursor:
@@ -380,7 +400,7 @@ def update_profile(
             (request.username, request.email, user["id"]),
         )
         cursor.execute("SELECT id, username, email, role FROM users WHERE id = %s", (user["id"],))
-        updated = cursor.fetchone()
+        updated = cast(dict[str, Any] | None, cursor.fetchone())
         db.commit()
 
     # Recalculate the public role and report if the account disappeared.
@@ -394,7 +414,7 @@ def update_profile(
 def get_recipes(
     recipe_id: int | None = Query(default=None, alias="id", gt=0),
     _: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Return one recipe when an ID is supplied; otherwise return the full list.
     columns = "id, name, category, description, ingredients, steps, image, cooking_time, created_by"
@@ -402,7 +422,7 @@ def get_recipes(
         # Fetch a single recipe when the caller supplied an ID.
         if recipe_id is not None:
             cursor.execute(f"SELECT {columns} FROM recipes WHERE id = %s", (recipe_id,))
-            recipe = cursor.fetchone()
+            recipe = cast(dict[str, Any] | None, cursor.fetchone())
             # Return a not-found response instead of an empty recipe.
             if not recipe:
                 raise HTTPException(status_code=404, detail="Recipe not found.")
@@ -416,7 +436,7 @@ def get_recipes(
 def add_recipe(
     request: RecipeRequest,
     user: dict[str, Any] = Depends(require_admin),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Store a recipe created by the authenticated administrator.
     with db.cursor() as cursor:
@@ -434,7 +454,8 @@ def add_recipe(
         )
         recipe_id = cursor.lastrowid
         db.commit()
-    recipe = {"id": recipe_id, **request.model_dump(), "created_by": user["id"]}
+    recipe: dict[str, Any] = {"id": recipe_id, "created_by": user["id"]}
+    recipe.update(request.model_dump())
     return {"success": True, "message": "Recipe added.", "recipe": recipe}
 
 
@@ -442,7 +463,7 @@ def add_recipe(
 def update_recipe(
     request: RecipeUpdateRequest,
     _: dict[str, Any] = Depends(require_admin),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Replace all editable fields on an existing recipe.
     with db.cursor() as cursor:
@@ -468,7 +489,7 @@ def update_recipe(
 def patch_recipe(
     request: RecipePatchRequest,
     _: dict[str, Any] = Depends(require_admin),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Build an update from only the fields explicitly supplied by the client.
     updates = request.model_dump(exclude_unset=True, exclude={"id"})
@@ -507,7 +528,7 @@ def patch_recipe(
 def delete_recipe(
     recipe_id: int = Query(alias="id", gt=0),
     _: dict[str, Any] = Depends(require_admin),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Delete a recipe by ID and report if no row was removed.
     with db.cursor() as cursor:
@@ -523,7 +544,7 @@ def delete_recipe(
 def get_comments(
     recipe_id: int = Query(gt=0),
     _: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Return comments for the selected recipe in chronological order.
     with db.cursor(dictionary=True) as cursor:
@@ -535,7 +556,7 @@ def get_comments(
             """,
             (recipe_id,),
         )
-        comments = cursor.fetchall()
+        comments = cast(list[dict[str, Any]], cursor.fetchall())
     return {"success": True, "message": "Comments loaded.", "comments": comments}
 
 
@@ -543,7 +564,7 @@ def get_comments(
 def add_comment(
     request: CommentRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Verify the recipe exists before storing the user's comment.
     with db.cursor() as cursor:
@@ -560,7 +581,7 @@ def add_comment(
     return {"success": True, "message": "Comment added.", "comment": {"id": comment_id}}
 
 
-def update_owned_comment(db: MySQLConnection, user_id: int, comment_id: int, message: str) -> None:
+def update_owned_comment(db: DBConnection, user_id: int, comment_id: int, message: str) -> None:
     # Update a comment only when it belongs to the requesting user.
     with db.cursor() as cursor:
         cursor.execute(
@@ -577,7 +598,7 @@ def update_owned_comment(db: MySQLConnection, user_id: int, comment_id: int, mes
 def update_comment(
     request: CommentUpdateRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Replace the comment message after verifying ownership.
     update_owned_comment(db, user["id"], request.id, request.message)
@@ -588,7 +609,7 @@ def update_comment(
 def patch_comment(
     request: CommentPatchRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Require a message in the partial update and then verify comment ownership.
     # Reject an empty patch instead of silently reporting a successful update.
@@ -602,7 +623,7 @@ def patch_comment(
 def delete_comment(
     comment_id: int = Query(alias="id", gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Allow administrators to delete any comment and users to delete their own.
     with db.cursor() as cursor:
@@ -625,7 +646,7 @@ def delete_comment(
 @app.get("/api/favorites")
 def get_favorites(
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Return the IDs of the current user's favorite recipes.
     with db.cursor() as cursor:
@@ -641,7 +662,7 @@ def get_favorites(
 def add_favorite(
     request: IdRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Verify the recipe and add it unless it is already a favorite.
     with db.cursor() as cursor:
@@ -668,7 +689,7 @@ def add_favorite(
 def remove_favorite(
     recipe_id: int = Query(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Remove a favorite belonging to the current user.
     with db.cursor() as cursor:
@@ -687,7 +708,7 @@ def remove_favorite(
 def get_rating(
     recipe_id: int = Query(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Confirm the recipe exists before returning its rating summary.
     with db.cursor() as cursor:
@@ -702,7 +723,7 @@ def get_rating(
 def save_rating(
     request: RatingRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Insert or replace the current user's rating for this recipe.
     with db.cursor() as cursor:
@@ -728,7 +749,7 @@ def save_rating(
 @app.get("/api/collections")
 def get_collections(
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Load each owned collection and attach its recipes.
     with db.cursor(dictionary=True) as cursor:
@@ -736,7 +757,7 @@ def get_collections(
             "SELECT id, name FROM collections WHERE user_id = %s ORDER BY name",
             (user["id"],),
         )
-        collections = cursor.fetchall()
+        collections = cast(list[dict[str, Any]], cursor.fetchall())
         # Attach each collection's recipe details to the response.
         for collection in collections:
             cursor.execute(
@@ -758,7 +779,7 @@ def get_collections(
 def add_collection(
     request: CollectionRequest,
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Trim and validate the name before creating the collection.
     name = request.name.strip()
@@ -788,7 +809,7 @@ def rename_collection(
     request: CollectionRequest,
     collection_id: int = ApiPath(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Rename an owned collection after validating the new name.
     name = request.name.strip()
@@ -817,7 +838,7 @@ def rename_collection(
 def delete_collection(
     collection_id: int = ApiPath(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Remove the collection's recipe links before deleting the owned collection.
     with db.cursor() as cursor:
@@ -832,7 +853,7 @@ def delete_collection(
 def get_collection_recipes(
     collection_id: int = ApiPath(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Return all recipes attached to the specified collection owned by the user.
     with db.cursor(dictionary=True) as cursor:
@@ -857,7 +878,7 @@ def add_recipe_to_collection(
     request: IdRequest,
     collection_id: int = ApiPath(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Verify ownership and recipe existence before creating the collection link.
     with db.cursor() as cursor:
@@ -886,7 +907,7 @@ def remove_recipe_from_collection(
     collection_id: int = ApiPath(gt=0),
     recipe_id: int = ApiPath(gt=0),
     user: dict[str, Any] = Depends(get_current_user),
-    db: MySQLConnection = Depends(get_db),
+    db: DBConnection = Depends(get_db),
 ) -> dict[str, Any]:
     # Remove a recipe link after verifying that the collection belongs to the user.
     with db.cursor() as cursor:
