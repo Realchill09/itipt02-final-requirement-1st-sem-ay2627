@@ -1,3 +1,54 @@
 <ion-app>
-  <ion-router-outlet></ion-router-outlet>
+  <ion-menu menuId="navigation-menu" contentId="app-router-outlet" side="start" type="overlay">
+    <ion-header>
+      <ion-toolbar color="success">
+        <ion-title>Food Archive</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <ion-list>
+        @if (isLoggedIn()) {
+          <ion-menu-toggle menu="navigation-menu">
+            <ion-item button detail="false" (click)="goHome()">
+              <ion-icon name="home-outline" slot="start"></ion-icon>
+              <ion-label>Home</ion-label>
+            </ion-item>
+          </ion-menu-toggle>
+
+          <ion-menu-toggle menu="navigation-menu">
+            <ion-item button detail="false" (click)="goProfile()">
+              <ion-icon name="person-circle-outline" slot="start"></ion-icon>
+              <ion-label>My Profile</ion-label>
+            </ion-item>
+          </ion-menu-toggle>
+
+          <ion-menu-toggle menu="navigation-menu">
+            <ion-item button detail="false" (click)="goCollections()">
+              <ion-icon name="albums-outline" slot="start"></ion-icon>
+              <ion-label>My Collections</ion-label>
+            </ion-item>
+          </ion-menu-toggle>
+
+          @if (isAdmin()) {
+            <ion-menu-toggle menu="navigation-menu">
+              <ion-item button detail="false" (click)="goAdmin()">
+                <ion-icon name="shield-checkmark-outline" slot="start"></ion-icon>
+                <ion-label>Admin Dashboard</ion-label>
+              </ion-item>
+            </ion-menu-toggle>
+          }
+
+          <ion-menu-toggle menu="navigation-menu">
+            <ion-item button detail="false" (click)="logout()">
+              <ion-icon name="log-out-outline" slot="start"></ion-icon>
+              <ion-label>Logout</ion-label>
+            </ion-item>
+          </ion-menu-toggle>
+        }
+      </ion-list>
+    </ion-content>
+  </ion-menu>
+
+  <ion-router-outlet id="app-router-outlet"></ion-router-outlet>
 </ion-app>
