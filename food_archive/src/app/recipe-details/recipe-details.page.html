@@ -1,0 +1,212 @@
+
+<ion-header>
+  <ion-toolbar color="light">
+    <ion-buttons slot="start">
+      <ion-menu-button menu="navigation-menu" aria-label="Open menu"></ion-menu-button>
+    </ion-buttons>
+
+    <ion-title>Recipe Details</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+
+  @if (loading()) {
+    <div class="loading-container">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Loading recipe...</p>
+    </div>
+  } @else if (recipe(); as item) {
+
+    <div class="recipe-container">
+
+      <!-- RECIPE HEADER -->
+      <div class="recipe-hero">
+        <div class="recipe-image">
+          @if (item.image) {
+            <img [src]="item.image" [alt]="item.name">
+          } @else {
+            <span>🍽️</span>
+          }
+        </div>
+
+        <div class="recipe-heading">
+          <ion-label color="primary">{{ item.category }}</ion-label>
+          <h1>{{ item.name }}</h1>
+          <p>{{ item.description }}</p>
+
+          <div class="recipe-time">
+            <ion-icon name="restaurant-outline"></ion-icon>
+            <span>{{ item.cooking_time || 'N/A' }} minutes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- INGREDIENTS -->
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>🥗 Ingredients</ion-card-title>
+        </ion-card-header>
+
+        <ion-card-content>
+          <ion-list lines="none">
+            @for (ingredient of item.ingredients; track $index) {
+              <ion-item>
+                <ion-label>{{ ingredient }}</ion-label>
+              </ion-item>
+            }
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- COOKING STEPS -->
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>👨‍🍳 How to Make</ion-card-title>
+        </ion-card-header>
+
+        <ion-card-content>
+          <ion-list lines="none">
+            @for (step of item.steps; track $index) {
+              <ion-item class="step-item">
+                <div class="step-number" slot="start">{{ $index + 1 }}</div>
+                <ion-label>{{ step }}</ion-label>
+              </ion-item>
+            }
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+
+      <!-- COMMENTS -->
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>⭐ Ratings</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p>
+            Average: {{ rating().average_rating }}/5
+            ({{ rating().rating_count }} ratings)
+          </p>
+          <p>Your rating:</p>
+          @for (starValue of ratingStars; track starValue) {
+            <ion-button
+              fill="clear"
+              size="small"
+              [attr.aria-label]="'Rate ' + starValue + ' out of 5'"
+              (click)="saveRating(starValue)">
+              <ion-icon
+                [name]="starValue <= (rating().user_rating ?? 0) ? 'star' : 'star-outline'">
+              </ion-icon>
+            </ion-button>
+          }
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>💬 Reviews</ion-card-title>
+          <p>Share your review of this recipe.</p>
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <!-- ADD COMMENT -->
+          <ion-item lines="none" class="comment-input">
+            <ion-textarea
+              placeholder="Write your review..."
+              [ngModel]="newComment()"
+              (ngModelChange)="newComment.set($event)"
+              autoGrow="true">
+            </ion-textarea>
+          </ion-item>
+
+          <ion-button
+            expand="block"
+            (click)="addComment()"
+            [disabled]="!newComment().trim()">
+            <ion-icon name="send-outline" slot="start"></ion-icon>
+            Post Review
+          </ion-button>
+
+          <div class="comments-list">
+
+            @for (comment of comments(); track comment.id) {
+              <div class="comment-item">
+
+                <div class="comment-header">
+                  <strong>{{ comment.username }}</strong>
+
+                  @if (isCommentOwner(comment) || isAdmin()) {
+                    <div class="comment-actions">
+                      @if (isCommentOwner(comment)) {
+                        <ion-button
+                          fill="clear"
+                          size="small"
+                          (click)="startEdit(comment)">
+                          <ion-icon name="create-outline"></ion-icon>
+                        </ion-button>
+                      }
+
+                      <ion-button
+                        fill="clear"
+                        color="danger"
+                        size="small"
+                        (click)="deleteComment(comment)">
+                        <ion-icon name="trash-outline"></ion-icon>
+                      </ion-button>
+                    </div>
+                  }
+                </div>
+
+                @if (editingCommentId() === comment.id) {
+
+                  <ion-textarea
+                    [ngModel]="editedMessage()"
+                    (ngModelChange)="editedMessage.set($event)"
+                    autoGrow="true">
+                  </ion-textarea>
+
+                  <div class="edit-actions">
+                    <ion-button
+                      size="small"
+                      (click)="updateComment(comment)">
+                      Save
+                    </ion-button>
+
+                    <ion-button
+                      size="small"
+                      fill="outline"
+                      color="medium"
+                      (click)="cancelEdit()">
+                      Cancel
+                    </ion-button>
+                  </div>
+
+                } @else {
+                  <p>{{ comment.message }}</p>
+                }
+
+                <small>{{ comment.created_at }}</small>
+
+              </div>
+            } @empty {
+              <p class="empty-comments">
+                No reviews yet. Be the first to review!
+              </p>
+            }
+
+          </div>
+
+        </ion-card-content>
+      </ion-card>
+
+    </div>
+
+  } @else {
+    <div class="loading-container">
+      <p>Recipe not found.</p>
+      <ion-button (click)="goBack()">Back to Home</ion-button>
+    </div>
+  }
+
+</ion-content>
