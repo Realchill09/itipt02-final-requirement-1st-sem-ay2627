@@ -27,10 +27,11 @@ food_archive/
 From the repository root, create a local virtual environment and install the
 backend dependencies:
 
-```powershell
+```cmd
 cd backend
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+python -m venv .venv 
+.venv\Scripts\Activate.bat
+
 python -m pip install -r requirements.txt
 uvicorn main:app --reload
 ```
@@ -44,10 +45,9 @@ local `backend/.env` file.
 
 In another terminal:
 
-```powershell
+```cmd
 cd food_archive
-npm ci
-npm start
+ionic serve
 ```
 
 The development server is available at <http://localhost:4200>. The API base
