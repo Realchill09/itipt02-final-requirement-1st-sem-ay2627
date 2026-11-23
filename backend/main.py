@@ -10,7 +10,6 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-# Hardcoded local settings - edit these values directly if your database changes.
 DB_HOST = "127.0.0.1"
 DB_PORT = 3306
 DB_USER = "root"
@@ -59,26 +58,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ---------------------------------------------------------------------------
-# Request models
-# ---------------------------------------------------------------------------
-
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
     email: str = Field(min_length=3, max_length=150)
     password: str = Field(min_length=8, max_length=72)
 
-
 class LoginRequest(BaseModel):
     email: str
     password: str
 
-
 class ProfileRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100)
     email: str = Field(min_length=3, max_length=150)
-
 
 class RecipeRequest(BaseModel):
     name: str = Field(min_length=1, max_length=150)
@@ -89,10 +80,8 @@ class RecipeRequest(BaseModel):
     image: str | None = None
     cooking_time: int | None = Field(default=None, ge=0)
 
-
 class RecipeUpdateRequest(RecipeRequest):
     id: int = Field(gt=0)
-
 
 class RecipePatchRequest(BaseModel):
     id: int = Field(gt=0)
@@ -104,38 +93,27 @@ class RecipePatchRequest(BaseModel):
     image: str | None = None
     cooking_time: int | None = Field(default=None, ge=0)
 
-
 class CommentRequest(BaseModel):
     recipe_id: int = Field(gt=0)
     message: str = Field(min_length=1, max_length=5000)
-
 
 class CommentUpdateRequest(BaseModel):
     id: int = Field(gt=0)
     message: str = Field(min_length=1, max_length=5000)
 
-
 class CommentPatchRequest(BaseModel):
     id: int = Field(gt=0)
     message: str | None = None
 
-
 class IdRequest(BaseModel):
     recipe_id: int = Field(gt=0)
-
 
 class RatingRequest(BaseModel):
     recipe_id: int = Field(gt=0)
     rating: int = Field(ge=1, le=5)
 
-
 class CollectionRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-
-
-# ---------------------------------------------------------------------------
-# Database and authentication helpers
-# ---------------------------------------------------------------------------
 
 def get_db() -> Generator[Any, Any, None]:
     try:
@@ -158,11 +136,8 @@ def get_db() -> Generator[Any, Any, None]:
     finally:
         db.close()
 
-
 def is_admin(user: dict[str, Any]) -> bool:
-    # admin only if the role is admin AND the email matches the hardcoded setting
     return user["role"] == "admin" and user["email"].strip().lower() == ADMIN_EMAIL
-
 
 def get_current_user(
     request: Request,
@@ -191,19 +166,12 @@ def get_current_user(
     user["role"] = "admin" if is_admin(user) else "user"
     return user
 
-
 def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     if not is_admin(user):
         raise HTTPException(status_code=400, detail="Administrator access is required.")
     return user
 
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
 def to_list(value: str | bytes | bytearray | None) -> list[str]:
-    # ingredients and steps are saved as JSON text, so turn them back into a list
     if value is None:
         return []
     try:
@@ -214,18 +182,15 @@ def to_list(value: str | bytes | bytearray | None) -> list[str]:
         return [str(item) for item in data]
     return []
 
-
 def format_recipe(row: dict[str, Any]) -> dict[str, Any]:
     row["ingredients"] = to_list(row["ingredients"])
     row["steps"] = to_list(row["steps"])
     return row
 
-
 def recipe_exists(cursor: Any, recipe_id: int) -> None:
     cursor.execute("SELECT id FROM recipes WHERE id = %s", (recipe_id,))
     if cursor.fetchone() is None:
         raise HTTPException(status_code=404, detail="Recipe not found.")
-
 
 def check_collection_owner(cursor: Any, collection_id: int, user_id: int) -> None:
     cursor.execute(
@@ -234,7 +199,6 @@ def check_collection_owner(cursor: Any, collection_id: int, user_id: int) -> Non
     )
     if cursor.fetchone() is None:
         raise HTTPException(status_code=404, detail="Collection not found.")
-
 
 def get_rating_summary(db: Any, recipe_id: int, user_id: int) -> dict[str, Any]:
     cursor = db.cursor(dictionary=True)
@@ -256,7 +220,6 @@ def get_rating_summary(db: Any, recipe_id: int, user_id: int) -> dict[str, Any]:
         "user_rating": result["user_rating"],
     }
 
-
 def update_comment_message(db: Any, user_id: int, comment_id: int, message: str) -> None:
     cursor = db.cursor()
     cursor.execute(
@@ -268,9 +231,7 @@ def update_comment_message(db: Any, user_id: int, comment_id: int, message: str)
     db.commit()
     cursor.close()
 
-
 def image_bytes_are_valid(extension: str, data: bytes) -> bool:
-    # check the first bytes of the file to make sure it is a real image
     if extension in [".jpg", ".jpeg"]:
         return data.startswith(b"\xff\xd8\xff")
     if extension == ".png":
@@ -279,11 +240,6 @@ def image_bytes_are_valid(extension: str, data: bytes) -> bool:
         return data.startswith(b"RIFF") and data[8:12] == b"WEBP"
     return False
 
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
 @app.get("/api/health")
 def health(db: Any = Depends(get_db)) -> dict[str, str]:
     cursor = db.cursor()
@@ -291,7 +247,6 @@ def health(db: Any = Depends(get_db)) -> dict[str, str]:
     cursor.fetchone()
     cursor.close()
     return {"status": "ok", "database": "connected"}
-
 
 @app.post("/api/auth/register")
 def register(request: RegisterRequest, db: Any = Depends(get_db)) -> dict[str, Any]:
@@ -310,7 +265,6 @@ def register(request: RegisterRequest, db: Any = Depends(get_db)) -> dict[str, A
     db.commit()
     cursor.close()
     return {"success": True, "message": "Registration successful."}
-
 
 @app.post("/api/auth/login")
 def login(
@@ -358,7 +312,6 @@ def login(
     }
     return {"success": True, "message": "Login successful.", "user": public_user}
 
-
 @app.post("/api/auth/logout")
 def logout(request: Request, response: Response, db: Any = Depends(get_db)) -> dict[str, Any]:
     session_id = request.cookies.get("foodarchive_session")
@@ -371,11 +324,9 @@ def logout(request: Request, response: Response, db: Any = Depends(get_db)) -> d
     response.delete_cookie(key="foodarchive_session", path="/")
     return {"success": True, "message": "Logged out."}
 
-
 @app.get("/api/auth/me")
 def current_user(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
     return {"success": True, "message": "Current user loaded.", "user": user}
-
 
 @app.put("/api/auth/profile")
 def update_profile(
@@ -404,7 +355,6 @@ def update_profile(
     updated["role"] = "admin" if is_admin(updated) else "user"
     return {"success": True, "message": "Profile updated successfully.", "user": updated}
 
-
 @app.get("/api/recipes")
 def get_recipes(
     recipe_id: int | None = Query(default=None, alias="id", gt=0),
@@ -413,7 +363,6 @@ def get_recipes(
 ) -> dict[str, Any]:
     cursor = db.cursor(dictionary=True)
 
-    # one recipe
     if recipe_id is not None:
         cursor.execute(f"SELECT {RECIPE_COLUMNS} FROM recipes WHERE id = %s", (recipe_id,))
         recipe = cursor.fetchone()
@@ -422,12 +371,10 @@ def get_recipes(
             raise HTTPException(status_code=404, detail="Recipe not found.")
         return {"success": True, "message": "Recipe loaded.", "recipe": format_recipe(recipe)}
 
-    # all recipes
     cursor.execute(f"SELECT {RECIPE_COLUMNS} FROM recipes ORDER BY id DESC")
     recipes = [format_recipe(row) for row in cursor.fetchall()]
     cursor.close()
     return {"success": True, "message": "Recipes loaded.", "recipes": recipes}
-
 
 @app.post("/api/recipes")
 def add_recipe(
@@ -462,7 +409,6 @@ def add_recipe(
     recipe["created_by"] = user["id"]
     return {"success": True, "message": "Recipe added.", "recipe": recipe}
 
-
 @app.put("/api/recipes")
 def update_recipe(
     request: RecipeUpdateRequest,
@@ -491,24 +437,20 @@ def update_recipe(
     cursor.close()
     return {"success": True, "message": "Recipe updated.", "recipe": request.model_dump()}
 
-
 @app.patch("/api/recipes")
 def patch_recipe(
     request: RecipePatchRequest,
     user: dict[str, Any] = Depends(require_admin),
     db: Any = Depends(get_db),
 ) -> dict[str, Any]:
-    # only the fields the client really sent
     updates = request.model_dump(exclude_unset=True, exclude={"id"})
     if not updates:
         raise HTTPException(status_code=400, detail="Provide at least one recipe field to update.")
 
-    # these fields cannot be set to null
     for field in ["name", "category", "description", "ingredients", "steps"]:
         if field in updates and updates[field] is None:
             raise HTTPException(status_code=400, detail="This recipe field cannot be null.")
 
-    # lists are saved as JSON text
     if "ingredients" in updates:
         updates["ingredients"] = json.dumps(updates["ingredients"])
     if "steps" in updates:
@@ -525,7 +467,6 @@ def patch_recipe(
     cursor.close()
     return {"success": True, "message": "Recipe updated.", "recipe": {"id": request.id, **updates}}
 
-
 @app.delete("/api/recipes")
 def delete_recipe(
     recipe_id: int = Query(alias="id", gt=0),
@@ -539,7 +480,6 @@ def delete_recipe(
     db.commit()
     cursor.close()
     return {"success": True, "message": "Recipe deleted."}
-
 
 @app.get("/api/comments")
 def get_comments(
@@ -561,7 +501,6 @@ def get_comments(
     cursor.close()
     return {"success": True, "message": "Comments loaded.", "comments": comments}
 
-
 @app.post("/api/comments")
 def add_comment(
     request: CommentRequest,
@@ -579,7 +518,6 @@ def add_comment(
     cursor.close()
     return {"success": True, "message": "Comment added.", "comment": {"id": comment_id}}
 
-
 @app.put("/api/comments")
 def update_comment(
     request: CommentUpdateRequest,
@@ -588,7 +526,6 @@ def update_comment(
 ) -> dict[str, Any]:
     update_comment_message(db, user["id"], request.id, request.message)
     return {"success": True, "message": "Comment updated."}
-
 
 @app.patch("/api/comments")
 def patch_comment(
@@ -601,7 +538,6 @@ def patch_comment(
     update_comment_message(db, user["id"], request.id, request.message)
     return {"success": True, "message": "Comment updated."}
 
-
 @app.delete("/api/comments")
 def delete_comment(
     comment_id: int = Query(alias="id", gt=0),
@@ -610,10 +546,8 @@ def delete_comment(
 ) -> dict[str, Any]:
     cursor = db.cursor()
     if is_admin(user):
-        # admin can delete any comment
         cursor.execute("DELETE FROM comments WHERE id = %s", (comment_id,))
     else:
-        # normal user can delete only their own comment
         cursor.execute(
             "DELETE FROM comments WHERE id = %s AND user_id = %s",
             (comment_id, user["id"]),
@@ -623,7 +557,6 @@ def delete_comment(
     db.commit()
     cursor.close()
     return {"success": True, "message": "Comment deleted."}
-
 
 @app.get("/api/favorites")
 def get_favorites(
@@ -639,7 +572,6 @@ def get_favorites(
     cursor.close()
     return {"success": True, "favorites": favorite_ids}
 
-
 @app.post("/api/favorites")
 def add_favorite(
     request: IdRequest,
@@ -649,7 +581,6 @@ def add_favorite(
     cursor = db.cursor()
     recipe_exists(cursor, request.recipe_id)
 
-    # skip if it is already a favorite
     cursor.execute(
         "SELECT user_id FROM favorites WHERE user_id = %s AND recipe_id = %s",
         (user["id"], request.recipe_id),
@@ -662,7 +593,6 @@ def add_favorite(
         db.commit()
     cursor.close()
     return {"success": True, "message": "Recipe added to favorites."}
-
 
 @app.delete("/api/favorites")
 def remove_favorite(
@@ -681,7 +611,6 @@ def remove_favorite(
     cursor.close()
     return {"success": True, "message": "Recipe removed from favorites."}
 
-
 @app.get("/api/ratings")
 def get_rating(
     recipe_id: int = Query(gt=0),
@@ -692,7 +621,6 @@ def get_rating(
     recipe_exists(cursor, recipe_id)
     cursor.close()
     return {"success": True, "rating": get_rating_summary(db, recipe_id, user["id"])}
-
 
 @app.put("/api/ratings")
 def save_rating(
@@ -717,7 +645,6 @@ def save_rating(
         "rating": get_rating_summary(db, request.recipe_id, user["id"]),
     }
 
-
 @app.get("/api/collections")
 def get_collections(
     user: dict[str, Any] = Depends(get_current_user),
@@ -730,14 +657,12 @@ def get_collections(
     )
     collections = cursor.fetchall()
 
-    # add the recipes of each collection
     for collection in collections:
         cursor.execute(RECIPES_IN_COLLECTION_SQL, (collection["id"],))
         collection["recipes"] = [format_recipe(row) for row in cursor.fetchall()]
 
     cursor.close()
     return {"success": True, "collections": collections}
-
 
 @app.post("/api/collections")
 def add_collection(
@@ -765,7 +690,6 @@ def add_collection(
     db.commit()
     cursor.close()
     return {"success": True, "message": "Collection created.", "collection": {"id": collection_id, "name": name}}
-
 
 @app.patch("/api/collections/{collection_id}")
 def rename_collection(
@@ -795,7 +719,6 @@ def rename_collection(
     cursor.close()
     return {"success": True, "message": "Collection renamed."}
 
-
 @app.delete("/api/collections/{collection_id}")
 def delete_collection(
     collection_id: int,
@@ -810,7 +733,6 @@ def delete_collection(
     cursor.close()
     return {"success": True, "message": "Collection deleted."}
 
-
 @app.get("/api/collections/{collection_id}/recipes")
 def get_collection_recipes(
     collection_id: int,
@@ -824,7 +746,6 @@ def get_collection_recipes(
     cursor.close()
     return {"success": True, "recipes": recipes}
 
-
 @app.post("/api/collections/{collection_id}/recipes")
 def add_recipe_to_collection(
     collection_id: int,
@@ -836,7 +757,6 @@ def add_recipe_to_collection(
     check_collection_owner(cursor, collection_id, user["id"])
     recipe_exists(cursor, request.recipe_id)
 
-    # skip if the recipe is already in the collection
     cursor.execute(
         "SELECT collection_id FROM collection_recipes WHERE collection_id = %s AND recipe_id = %s",
         (collection_id, request.recipe_id),
@@ -849,7 +769,6 @@ def add_recipe_to_collection(
         db.commit()
     cursor.close()
     return {"success": True, "message": "Recipe added to collection."}
-
 
 @app.delete("/api/collections/{collection_id}/recipes/{recipe_id}")
 def remove_recipe_from_collection(
@@ -870,7 +789,6 @@ def remove_recipe_from_collection(
     cursor.close()
     return {"success": True, "message": "Recipe removed from collection."}
 
-
 @app.post("/api/uploads")
 def upload_recipe_image(
     request: Request,
@@ -879,23 +797,19 @@ def upload_recipe_image(
 ) -> dict[str, Any]:
     extension = Path(image.filename or "").suffix.lower()
 
-    # check file type
     if extension not in IMAGE_TYPES or image.content_type != IMAGE_TYPES[extension]:
         raise HTTPException(status_code=400, detail="Upload a JPEG, PNG, or WebP image.")
 
-    # read one extra byte so we can tell if the file is too big
     content = image.file.read(MAX_IMAGE_SIZE + 1)
     if len(content) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="Image must be 5 MB or smaller.")
     if not content or not image_bytes_are_valid(extension, content):
         raise HTTPException(status_code=400, detail="The uploaded file is not a valid image.")
 
-    # save with a random name so files never overwrite each other
     filename = uuid.uuid4().hex + extension
     (UPLOAD_FOLDER / filename).write_bytes(content)
 
     url = str(request.base_url).rstrip("/") + "/api/uploads/" + filename
     return {"success": True, "url": url}
-
 
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_FOLDER)), name="uploads")
