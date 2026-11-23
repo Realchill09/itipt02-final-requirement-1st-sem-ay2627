@@ -52,10 +52,10 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/admin.page').then((m) => m.Admin),
   },
 
-  // Default route
+  // Default route - always start at the login page
   {
     path: '',
-    redirectTo: 'home',
+    redirectTo: 'login',
     pathMatch: 'full',
   },
 

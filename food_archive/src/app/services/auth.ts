@@ -1,6 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { catchError, finalize, map, of, tap, throwError } from 'rxjs';
+import { finalize, of, tap } from 'rxjs';
 import type { Observable } from 'rxjs';
 
 import { Api } from './api';
@@ -53,31 +52,14 @@ export class Auth {
     );
   }
 
-  // Confirm the session cookie is valid and restore the current user.
+  // Always start each app run logged out; do not restore a previous session.
   checkSession(): Observable<boolean> {
     if (this.sessionChecked) {
       return of(this.isLoggedIn());
     }
 
-    return this.api.get<AuthResponse>('auth/me').pipe(
-      tap((response) => {
-        if (!response.success || !response.user) {
-          throw new Error('The server returned an invalid session response.');
-        }
-
-        this.setUser(response.user);
-        this.sessionChecked = true;
-      }),
-      map(() => true),
-      catchError((error) => {
-        if (error instanceof HttpErrorResponse && error.status === 401) {
-          this.clearSession();
-          return of(false);
-        }
-
-        return throwError(() => error);
-      }),
-    );
+    this.clearSession();
+    return of(false);
   }
 
   // End the backend session and clear local user state.

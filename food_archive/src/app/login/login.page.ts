@@ -109,7 +109,7 @@ export class Login {
       error: async (error) => {
         this.loading = false;
 
-        if (error.status === 401) {
+        if (error.status === 400) {
           await this.showLoginErrorToast('Incorrect email or password.');
           return;
         }

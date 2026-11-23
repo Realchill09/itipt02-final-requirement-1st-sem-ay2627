@@ -4,26 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import {
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonButtons,
-  IonButton,
-  IonIcon,
-  IonMenuButton,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonItem,
-  IonLabel,
-  IonInput,
-  IonTextarea,
-  IonSelect,
-  IonSelectOption,
-  IonSpinner,
-  ToastController
+  IonHeader, IonToolbar, IonTitle, IonContent,
+  IonButtons, IonButton, IonIcon, IonMenuButton, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, 
+  IonTextarea, IonSelect, IonSelectOption, IonSpinner, ToastController
 } from '@ionic/angular';
 
 import { addIcons } from 'ionicons';
@@ -36,34 +19,14 @@ import {
 import { RecipeService } from '../services/recipe';
 import type { Recipe } from '../services/recipe';
 
-// Provide the admin interface for managing recipes and their images.
 @Component({
   selector: 'app-admin',
   templateUrl: './admin.page.html',
   styleUrl: './admin.page.scss',
   standalone: true,
   imports: [
-    CommonModule,
-    FormsModule,
-    IonHeader,
-    IonToolbar,
-    IonTitle,
-    IonContent,
-    IonButtons,
-    IonButton,
-    IonIcon,
-    IonMenuButton,
-    IonCard,
-    IonCardHeader,
-    IonCardTitle,
-    IonCardContent,
-    IonItem,
-    IonLabel,
-    IonInput,
-    IonTextarea,
-    IonSelect,
-    IonSelectOption,
-    IonSpinner
+    CommonModule, FormsModule, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton, IonIcon, IonMenuButton, IonCard, IonCardHeader,
+    IonCardTitle, IonCardContent, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonSpinner
   ]
 })
 export class Admin implements OnInit {
@@ -90,19 +53,17 @@ export class Admin implements OnInit {
   newIngredient = '';
   newStep = '';
 
-  // Register the icons used in the admin interface.
   constructor(
     private recipeService: RecipeService
   ) {
     addIcons({restaurantOutline,addOutline,saveOutline,createOutline,trashOutline});
   }
 
-  // Load the recipe list when the admin page opens.
   ngOnInit(): void {
     this.loadRecipes();
   }
 
-  // Fetch recipes from the API and report loading failures.
+
   loadRecipes(): void {
     this.recipeService.getRecipes().subscribe({
       error: async error => {
@@ -112,13 +73,13 @@ export class Admin implements OnInit {
     });
   }
 
-  // Clear the form and open it for a new recipe.
+  
   openAddForm(): void {
     this.resetForm();
     this.showForm.set(true);
   }
 
-  // Fill the form with an existing recipe for editing.
+
   editRecipe(recipe: Recipe): void {
     this.editingId.set(recipe.id);
 
@@ -137,7 +98,7 @@ export class Admin implements OnInit {
     this.showForm.set(true);
   }
 
-  // Add the entered ingredient to the recipe form.
+
   addIngredient(): void {
     const ingredient = this.newIngredient.trim();
     if (!ingredient) {
@@ -148,14 +109,14 @@ export class Admin implements OnInit {
     this.newIngredient = '';
   }
 
-  // Remove an ingredient from the recipe form by its index.
+
   removeIngredient(index: number): void {
     this.recipeForm.ingredients = this.recipeForm.ingredients.filter(
       (_, ingredientIndex) => ingredientIndex !== index
     );
   }
 
-  // Add the entered cooking step to the recipe form.
+
   addStep(): void {
     const step = this.newStep.trim();
     if (!step) {
@@ -166,14 +127,14 @@ export class Admin implements OnInit {
     this.newStep = '';
   }
 
-  // Remove a cooking step from the recipe form by its index.
+
   removeStep(index: number): void {
     this.recipeForm.steps = this.recipeForm.steps.filter(
       (_, stepIndex) => stepIndex !== index
     );
   }
 
-  // Validate form fields and create or update the recipe.
+
   async saveRecipe(): Promise<void> {
     const form = this.recipeForm;
 
@@ -223,7 +184,7 @@ export class Admin implements OnInit {
     });
   }
 
-  // Upload the selected image and place its URL in the recipe form.
+
   uploadRecipeImage(event: Event): void {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) {
@@ -252,7 +213,7 @@ export class Admin implements OnInit {
     });
   }
 
-  // Ask for confirmation before deleting a recipe.
+
   deleteRecipe(recipe: Recipe): void {
     if (!confirm(`Delete "${recipe.name}"?`)) return;
 
@@ -271,7 +232,7 @@ export class Admin implements OnInit {
     });
   }
 
-  // Display a brief notification about an admin action.
+
   private async showToast(
     message: string,
     color: 'success' | 'warning' | 'danger' = 'danger'
@@ -285,13 +246,13 @@ export class Admin implements OnInit {
     await toast.present();
   }
 
-  // Close the editor and clear its current values.
+ 
   cancelForm(): void {
     this.showForm.set(false);
     this.resetForm();
   }
 
-  // Restore the recipe form to its initial values.
+
   resetForm(): void {
     this.editingId.set(null);
 

@@ -2,7 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 
-import { environment } from '../../environments/environment';
+// Hardcoded backend address - edit this value directly if the API moves.
+const API_URL = 'http://127.0.0.1:8000/api';
 
 @Injectable({
   providedIn: 'root',
@@ -12,8 +13,9 @@ export class Api {
   private apiUrl = this.resolveApiUrl();
   private http = inject(HttpClient);
 
+  // Use the page's host for local development so the login cookie is sent.
   private resolveApiUrl(): string {
-    const apiUrl = new URL(environment.apiUrl);
+    const apiUrl = new URL(API_URL);
     const localHosts = ['localhost', '127.0.0.1'];
     const pageHost = window.location.hostname;
 
@@ -24,7 +26,7 @@ export class Api {
     return apiUrl.toString().replace(/\/+$/, '');
   }
 
-  // Combine the configured API address with an endpoint path.
+  // Combine the hardcoded API address with an endpoint path.
   private endpoint(route: string): string {
     return `${this.apiUrl}/${route}`;
   }
