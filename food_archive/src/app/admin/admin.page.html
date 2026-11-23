@@ -76,9 +76,9 @@
 
               <ion-select-option value="Chicken">Chicken</ion-select-option>
               <ion-select-option value="Beef">Beef</ion-select-option>
+              <ion-select-option value="Pork">Pork</ion-select-option>
               <ion-select-option value="Pasta">Pasta</ion-select-option>
               <ion-select-option value="Dessert">Dessert</ion-select-option>
-
             </ion-select>
           </ion-item>
 
@@ -129,6 +129,13 @@
             <p class="image-upload-hint">Only one image is allowed per recipe.</p>
             @if (uploadingImage()) {
               <p>Uploading image...</p>
+            }
+            @if (recipeForm.image) {
+              <div class="recipe-image">
+                <img
+                  [src]="recipeForm.image"
+                  [alt]="recipeForm.name ? recipeForm.name + ' preview' : 'Recipe image preview'">
+              </div>
             }
           </div>
 
@@ -242,7 +249,15 @@
 
             <ion-card-content>
 
-              <div class="recipe-information">
+              <div class="recipe-info">
+
+                <div class="recipe-image">
+                  @if (recipe.image) {
+                    <img [src]="recipe.image" [alt]="recipe.name + ' image'">
+                  } @else {
+                    <span aria-hidden="true">🍽️</span>
+                  }
+                </div>
 
                 <div class="recipe-details">
                   <h3>{{ recipe.name }}</h3>

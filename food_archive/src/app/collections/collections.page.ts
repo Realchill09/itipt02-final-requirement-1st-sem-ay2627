@@ -64,7 +64,7 @@ export class CollectionsPage implements OnInit {
   collections = signal<RecipeCollection[]>([]);
   recipes = this.recipeService.recipes;
   newCollectionName = signal('');
-  selectedRecipeIds = signal<Record<number, number | undefined>>({});
+  selectedRecipeIds = signal<Record<number, number[]>>({});
   creatingCollection = signal(false);
   deletingCollectionIds = signal(new Set<number>());
   private nextTemporaryCollectionId = -1;
@@ -172,36 +172,36 @@ export class CollectionsPage implements OnInit {
     return collection.recipes.some(recipe => recipe.id === recipeId);
   }
 
-  // Add the selected recipe to a collection.
+  // Add the selected recipes to a collection.
   addRecipe(collection: RecipeCollection): void {
-    const recipeId = this.selectedRecipeIds()[collection.id];
-    if (!recipeId) {
+    const recipeIds = [...new Set(this.selectedRecipeIds()[collection.id] ?? [])];
+    if (recipeIds.length === 0) {
       return;
     }
 
-    const recipe = this.recipes().find(item => item.id === recipeId);
-    if (!recipe) {
-      void this.showToast('Unable to find the selected recipe.');
+    const recipesToAdd = this.recipes().filter(recipe => recipeIds.includes(recipe.id));
+    if (recipesToAdd.length !== recipeIds.length) {
+      void this.showToast('Unable to find one or more selected recipes.');
       return;
     }
 
-    this.selectedRecipeIds.update(selected => ({ ...selected, [collection.id]: undefined }));
+    this.selectedRecipeIds.update(selected => ({ ...selected, [collection.id]: [] }));
     this.collections.update(collections => collections.map(item => item.id === collection.id
       ? {
           ...item,
-          recipes: [...item.recipes, recipe].sort((a, b) => a.name.localeCompare(b.name)),
+          recipes: [...item.recipes, ...recipesToAdd].sort((a, b) => a.name.localeCompare(b.name)),
         }
       : item));
 
     if (collection.id < 0) {
       this.pendingRecipeIds[collection.id] = [
         ...(this.pendingRecipeIds[collection.id] ?? []),
-        recipeId,
+        ...recipeIds,
       ];
       return;
     }
 
-    this.persistRecipeAddition(collection.id, recipeId);
+    recipeIds.forEach(recipeId => this.persistRecipeAddition(collection.id, recipeId));
   }
 
   private persistRecipeAddition(collectionId: number, recipeId: number): void {
@@ -209,8 +209,12 @@ export class CollectionsPage implements OnInit {
       this.collections.update(collections => collections.map(item => item.id === collectionId
         ? { ...item, recipes: item.recipes.filter(existing => existing.id !== recipeId) }
         : item));
-      if (!this.selectedRecipeIds()[collectionId]) {
-        this.selectedRecipeIds.update(selected => ({ ...selected, [collectionId]: recipeId }));
+      const selectedRecipeIds = this.selectedRecipeIds()[collectionId] ?? [];
+      if (!selectedRecipeIds.includes(recipeId)) {
+        this.selectedRecipeIds.update(selected => ({
+          ...selected,
+          [collectionId]: [...selectedRecipeIds, recipeId],
+        }));
       }
     };
 
@@ -311,8 +315,11 @@ export class CollectionsPage implements OnInit {
     });
   }
 
-  setSelectedRecipe(collectionId: number, recipeId: number | undefined): void {
-    this.selectedRecipeIds.update(selected => ({ ...selected, [collectionId]: recipeId }));
+  setSelectedRecipes(collectionId: number, recipeIds: number[] | null | undefined): void {
+    this.selectedRecipeIds.update(selected => ({
+      ...selected,
+      [collectionId]: recipeIds ?? [],
+    }));
   }
 
   private async showToast(message: string, color: 'danger' | 'success' = 'danger'): Promise<void> {

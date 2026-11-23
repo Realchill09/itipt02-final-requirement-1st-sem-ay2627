@@ -11,7 +11,6 @@ import {
   IonButtons,
   IonButton,
   IonIcon,
-  IonMenuButton,
   IonCard,
   IonCardHeader,
   IonCardTitle,
@@ -25,6 +24,7 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
+  arrowBackOutline,
   createOutline,
   trashOutline,
   sendOutline,
@@ -54,7 +54,6 @@ import { RecipeService } from '../services/recipe';
     IonButtons,
     IonButton,
     IonIcon,
-    IonMenuButton,
     IonCard,
     IonCardHeader,
     IonCardTitle,
@@ -100,6 +99,7 @@ export class RecipeDetailsPage implements OnInit {
   // Register the icons used for recipe actions and ratings.
   constructor() {
     addIcons({
+      arrowBackOutline,
       createOutline,
       trashOutline,
       sendOutline,

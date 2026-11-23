@@ -20,8 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_FOLDER)), name="uploads")
-
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(recipes.router)
@@ -30,3 +28,5 @@ app.include_router(favorites.router)
 app.include_router(ratings.router)
 app.include_router(collections.router)
 app.include_router(uploads.router)
+
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_FOLDER)), name="uploads")

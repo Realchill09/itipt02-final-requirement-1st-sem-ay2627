@@ -39,10 +39,11 @@
         <ion-card-content>
           <ion-item>
             <ion-select
-              label="Choose a recipe"
+              label="Choose recipes"
               labelPlacement="stacked"
-              [ngModel]="selectedRecipeIds()[collection.id]"
-              (ngModelChange)="setSelectedRecipe(collection.id, $event)">
+              [multiple]="true"
+              [ngModel]="selectedRecipeIds()[collection.id] ?? []"
+              (ngModelChange)="setSelectedRecipes(collection.id, $event)">
               @for (recipe of recipes(); track recipe.id) {
                 <ion-select-option
                   [value]="recipe.id"
@@ -56,8 +57,8 @@
             expand="block"
             fill="outline"
             (click)="addRecipe(collection)"
-            [disabled]="!selectedRecipeIds()[collection.id]">
-            Add Recipe
+            [disabled]="(selectedRecipeIds()[collection.id] ?? []).length === 0">
+            Add Recipes
           </ion-button>
 
           @for (recipe of collection.recipes; track recipe.id) {

@@ -127,6 +127,12 @@
           @for (recipe of filteredRecipes(); track recipe.id) {
             <ion-card class="recipe-card">
 
+              @if (recipe.image) {
+                <img class="recipe-card-image" [src]="recipe.image" [alt]="recipe.name">
+              } @else {
+                <div class="recipe-card-placeholder" aria-hidden="true">🍽️</div>
+              }
+
               <ion-card-header>
                 <ion-card-title>
                   {{ recipe.name }}

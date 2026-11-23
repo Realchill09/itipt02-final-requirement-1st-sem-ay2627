@@ -9,8 +9,20 @@ import { environment } from '../../environments/environment';
 })
 // Send typed HTTP requests to the backend with the login cookie attached.
 export class Api {
-  private apiUrl = environment.apiUrl.replace(/\/+$/, '');
+  private apiUrl = this.resolveApiUrl();
   private http = inject(HttpClient);
+
+  private resolveApiUrl(): string {
+    const apiUrl = new URL(environment.apiUrl);
+    const localHosts = ['localhost', '127.0.0.1'];
+    const pageHost = window.location.hostname;
+
+    if (localHosts.includes(apiUrl.hostname) && localHosts.includes(pageHost)) {
+      apiUrl.hostname = pageHost;
+    }
+
+    return apiUrl.toString().replace(/\/+$/, '');
+  }
 
   // Combine the configured API address with an endpoint path.
   private endpoint(route: string): string {
